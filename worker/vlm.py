@@ -74,20 +74,17 @@ def parse_image_timestamp(image_path):
         return match.group('ts')
     return ""
 
-def run_inference(vlm_prompt, prompt, image_paths):
+def run_inference(vlm_prompt, prompt, image_paths, temperature: float = 0.2):
     start_image = None
     end_image = None
-    
-    # Get model names from environment variables
+
+    # Get model name from environment variables (VLM only)
     vlm_model = os.environ.get("VLM_MODEL", "llava:7b")
-    llm_model = os.environ.get("LLM_MODEL", "llama3:latest")
-    
-    logger.info("Using VLM model: " + vlm_model)
-    logger.info("Using LLM model: " + llm_model)
-    
-    # Ensure models are available
+
+    logger.info("Using VLM model: " + vlm_model + " with temperature=" + str(temperature) + " and max_tokens=10")
+
+    # Ensure VLM model is available
     ensure_model_available(vlm_model)
-    ensure_model_available(llm_model)
 
     logger.info("Running inference: image_count=" + str(len(image_paths)) + " image_paths=" + str(image_paths))
     results = "id,timestamp,event\n"
@@ -98,29 +95,18 @@ def run_inference(vlm_prompt, prompt, image_paths):
             model=vlm_model,
             prompt=vlm_prompt,
             images=[image_path],
+            options={
+                "temperature": float(temperature),
+                "num_predict": 10
+            },
         )
         results += '"' + parse_image_id(image_path) + '",' + '"' + parse_image_timestamp(image_path) + '",' + '"' + res.response + '"\n'
         logger.info("Inference output: " + str(res))
 
     logger.info("Inference completed")
 
-    # Compose a prompt for temporal reasoning
-    temporal_prompt = (
-        "Given the timeline in the format of id,timestamp,event" + "\n" +
-        "Timeline:" + results + "\n" +
-        prompt
-    )
-
-    # Run the LLM for temporal reasoning
-    temporal_res = ollama.generate(
-        model=llm_model,
-        prompt=temporal_prompt,
-    )
-    logger.info("Temporal reasoning output: " + temporal_res.response)
-
     return {
-        "logs": results,
-        "temporal_output": temporal_res.response
+        "logs": results
     }
 
 def send_webhook(webhook_url, job_id, data, error):
@@ -183,7 +169,8 @@ def run(conn, job, input_dir, output_dir):
         return
 
     try:
-        results = run_inference(inputs['vlm_prompt'], inputs['prompt'], image_paths)
+        temperature = float(inputs.get('temperature', os.environ.get("VLM_TEMPERATURE", 0.2)))
+        results = run_inference(inputs['vlm_prompt'], inputs['prompt'], image_paths, temperature=temperature)
     except Exception as e:
         logger.error("Error processing job", extra={"job_id": job['id'], "error": str(e)})
         err = {

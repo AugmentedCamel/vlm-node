@@ -96,6 +96,7 @@ pub async fn send_to_ollama(
         "images": images_b64,
         "model": model.clone(),
         "stream": true,
+        "num_predict": 10,
     });
 
     let url = format!("{}/api/generate", ollama_host);
