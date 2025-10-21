@@ -58,7 +58,7 @@ services:
     environment:
       - POSTGRES_URL=postgres://compute_node_user:compute_node_password@postgres:5432/compute_node_db
       - DATA_DIR=/app/data
-      - OLLAMA_HOST=http://ollama-gpu:11434
+      - OLLAMA_HOST=http://ollama:11434
     env_file:
       - .env
       - .env.local
@@ -71,21 +71,15 @@ services:
         condition: service_healthy
       change-data-folder-ownership:
         condition: service_completed_successfully
-      ollama-gpu:
-        condition: service_started
     volumes:
       - ./data:/app/data
-
   worker:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
-    image: aukilabs/vlm-node-worker:local
-    pull_policy: never
+    image: aukilabs/vlm-node-worker:stable
+    pull_policy: always
     environment:
       - POSTGRES_URL=postgres://compute_node_user:compute_node_password@postgres:5432/compute_node_db
       - DATA_DIR=/app/data
-      - OLLAMA_HOST=http://ollama-gpu:11434
+      - OLLAMA_HOST=http://ollama:11434
     env_file:
       - .env
       - .env.local
@@ -98,8 +92,6 @@ services:
         condition: service_healthy
       change-data-folder-ownership:
         condition: service_completed_successfully
-      ollama-gpu:
-        condition: service_started
     volumes:
       - ./data:/app/data
   ollama-cpu:
@@ -126,7 +118,7 @@ services:
       - "11435:11434"
     volumes:
       - ./data/.ollama:/root/.ollama
-    shm_size: 14gb
+    shm_size: 16gb
     deploy:
       resources:
         reservations:
@@ -135,7 +127,7 @@ services:
               count: 1
               capabilities: [gpu]
     # For Compose v2+ with NVIDIA runtime, uncomment below:
-    runtime: nvidia
+    # runtime: nvidia
 volumes:
   postgres_data:
   conf:
